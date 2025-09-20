@@ -18,9 +18,10 @@ namespace App\Services\Auth\Traits\Custom\Verification;
 
 use App\Helpers\Common\Num;
 use App\Services\Auth\App\Notifications\VerifyPhoneCode;
-use App\Services\Twilio\TwilioVerifyService;
 use Illuminate\Http\JsonResponse;
+use RuntimeException;
 use Throwable;
+use Twilio\Rest\Client;
 
 trait PhoneVerificationTrait
 {
@@ -168,13 +169,9 @@ trait PhoneVerificationTrait
                 // Send Confirmation Email
                 try {
                         if ($useTwilioVerify) {
-                                /** @var \App\Services\Twilio\TwilioVerifyService $twilioVerify */
-                                $twilioVerify = app(TwilioVerifyService::class);
+                                $phoneNumber = phoneE164($object->phone, $object->phone_country) ?: (string)$object->phone;
 
-                                $phoneNumber = phoneE164($object->phone, $object->phone_country);
-                                $phoneNumber = setPhoneSign($phoneNumber, 'twilio');
-
-                                $twilioVerify->sendVerification($phoneNumber, (string)$object->phone_token, $languageCode);
+                                $this->sendTwilioVerifyCode($phoneNumber, (string)$object->phone_token, $languageCode);
                         } else {
                                 if (!empty($languageCode)) {
                                         $object->notify((new VerifyPhoneCode($object, $entityMetadata))->locale($languageCode));
@@ -186,20 +183,53 @@ trait PhoneVerificationTrait
                         if ($displayFlashMessage) {
                                 $message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
 
-				$data['success'] = true;
-				$data['message'] = $message;
-			}
-			
-			$data['extra']['fieldVerificationSent'] = true;
-			
-			return $data;
-		} catch (Throwable $e) {
-			$message = replaceNewlinesWithSpace($e->getMessage());
-			
-			$data['success'] = false;
-			$data['message'] = $message;
-			
-			return $data;
-		}
-	}
+                                $data['success'] = true;
+                                $data['message'] = $message;
+                        }
+
+                        $data['extra']['fieldVerificationSent'] = true;
+
+                        return $data;
+                } catch (Throwable $e) {
+                        $message = replaceNewlinesWithSpace($e->getMessage());
+
+                        $data['success'] = false;
+                        $data['message'] = $message;
+
+                        return $data;
+                }
+        }
+
+        /**
+         * Dispatch a verification request using Twilio Verify.
+         */
+        protected function sendTwilioVerifyCode(string $phoneNumber, string $code, ?string $locale = null): void
+        {
+                $accountSid = config('twilio-notification-channel.account_sid');
+                $authToken = config('twilio-notification-channel.auth_token');
+                $serviceSid = config('twilio-notification-channel.verify_service_sid') ?? env('TWILIO_VERIFY_SERVICE_SID');
+                $debugTo = config('twilio-notification-channel.debug_to');
+
+                if (empty($accountSid) || empty($authToken) || empty($serviceSid)) {
+                        throw new RuntimeException('Twilio Verify is not properly configured.');
+                }
+
+                $destination = $debugTo ?? $phoneNumber;
+                $destination = setPhoneSign($destination, 'twilio');
+
+                $payload = [
+                        'channel'    => 'sms',
+                        'customCode' => $code,
+                ];
+
+                if (!empty($locale)) {
+                        $payload['locale'] = str_replace('_', '-', $locale);
+                }
+
+                (new Client($accountSid, $authToken))
+                        ->verify->v2
+                        ->services($serviceSid)
+                        ->verifications
+                        ->create($destination, 'sms', $payload);
+        }
 }
