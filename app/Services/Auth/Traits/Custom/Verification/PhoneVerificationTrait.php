@@ -19,7 +19,9 @@ namespace App\Services\Auth\Traits\Custom\Verification;
 use App\Helpers\Common\Num;
 use App\Services\Auth\App\Notifications\VerifyPhoneCode;
 use Illuminate\Http\JsonResponse;
+use RuntimeException;
 use Throwable;
+use Twilio\Rest\Client;
 
 trait PhoneVerificationTrait
 {
@@ -159,31 +161,75 @@ trait PhoneVerificationTrait
 		$data = $this->updateExtraDataForPhone($entityMetadata, $object, $data);
 		$fieldHiddenValue = $data['extra']['fieldHiddenValue'] ?? '*********';
 		
-		// Send Confirmation Email
-		try {
-			if (!empty($languageCode)) {
-				$object->notify((new VerifyPhoneCode($object, $entityMetadata))->locale($languageCode));
-			} else {
-				$object->notify(new VerifyPhoneCode($object, $entityMetadata));
-			}
-			
-			if ($displayFlashMessage) {
-				$message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
-				
-				$data['success'] = true;
-				$data['message'] = $message;
-			}
-			
-			$data['extra']['fieldVerificationSent'] = true;
-			
-			return $data;
-		} catch (Throwable $e) {
-			$message = replaceNewlinesWithSpace($e->getMessage());
-			
-			$data['success'] = false;
-			$data['message'] = $message;
-			
-			return $data;
-		}
-	}
+                $useTwilioVerify = (
+                        config('settings.sms.driver') == 'twilio'
+                        && !empty(config('twilio-notification-channel.verify_service_sid'))
+                );
+
+                // Send Confirmation Email
+                try {
+                        if ($useTwilioVerify) {
+                                $phoneNumber = phoneE164($object->phone, $object->phone_country) ?: (string)$object->phone;
+
+                                $this->sendTwilioVerifyCode($phoneNumber, (string)$object->phone_token, $languageCode);
+                        } else {
+                                if (!empty($languageCode)) {
+                                        $object->notify((new VerifyPhoneCode($object, $entityMetadata))->locale($languageCode));
+                                } else {
+                                        $object->notify(new VerifyPhoneCode($object, $entityMetadata));
+                                }
+                        }
+
+                        if ($displayFlashMessage) {
+                                $message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
+
+                                $data['success'] = true;
+                                $data['message'] = $message;
+                        }
+
+                        $data['extra']['fieldVerificationSent'] = true;
+
+                        return $data;
+                } catch (Throwable $e) {
+                        $message = replaceNewlinesWithSpace($e->getMessage());
+
+                        $data['success'] = false;
+                        $data['message'] = $message;
+
+                        return $data;
+                }
+        }
+
+        /**
+         * Dispatch a verification request using Twilio Verify.
+         */
+        protected function sendTwilioVerifyCode(string $phoneNumber, string $code, ?string $locale = null): void
+        {
+                $accountSid = config('twilio-notification-channel.account_sid');
+                $authToken = config('twilio-notification-channel.auth_token');
+                $serviceSid = config('twilio-notification-channel.verify_service_sid') ?? env('TWILIO_VERIFY_SERVICE_SID');
+                $debugTo = config('twilio-notification-channel.debug_to');
+
+                if (empty($accountSid) || empty($authToken) || empty($serviceSid)) {
+                        throw new RuntimeException('Twilio Verify is not properly configured.');
+                }
+
+                $destination = $debugTo ?? $phoneNumber;
+                $destination = setPhoneSign($destination, 'twilio');
+
+                $payload = [
+                        'channel'    => 'sms',
+                        'customCode' => $code,
+                ];
+
+                if (!empty($locale)) {
+                        $payload['locale'] = str_replace('_', '-', $locale);
+                }
+
+                (new Client($accountSid, $authToken))
+                        ->verify->v2
+                        ->services($serviceSid)
+                        ->verifications
+                        ->create($destination, 'sms', $payload);
+        }
 }

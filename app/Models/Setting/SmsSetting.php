@@ -51,12 +51,13 @@ class SmsSetting
 			'twilio_password'            => env('TWILIO_PASSWORD', ''),
 			'twilio_auth_token'          => env('TWILIO_AUTH_TOKEN', ''),
 			'twilio_account_sid'         => env('TWILIO_ACCOUNT_SID', ''),
-			'twilio_from'                => env('TWILIO_FROM', ''),
-			'twilio_alpha_sender'        => env('TWILIO_ALPHA_SENDER', ''),
-			'twilio_sms_service_sid'     => env('TWILIO_SMS_SERVICE_SID', ''),
-			'twilio_debug_to'            => env('TWILIO_DEBUG_TO', ''),
-			'phone_verification'         => '1',
-		];
+                        'twilio_from'                => env('TWILIO_FROM', ''),
+                        'twilio_alpha_sender'        => env('TWILIO_ALPHA_SENDER', ''),
+                        'twilio_sms_service_sid'     => env('TWILIO_SMS_SERVICE_SID', ''),
+                        'twilio_verify_service_sid'  => env('TWILIO_VERIFY_SERVICE_SID', ''),
+                        'twilio_debug_to'            => env('TWILIO_DEBUG_TO', ''),
+                        'phone_verification'         => '1',
+                ];
 		
 		return array_merge($defaultValue, $value);
 	}
@@ -319,21 +320,31 @@ class SmsSetting
 					'class' => 'col-md-6 twilio',
 				],
 			];
-			$fields[] = [
-				'name'     => 'twilio_sms_service_sid',
-				'label'    => trans('admin.twilio_sms_service_sid_label'),
-				'type'     => 'text',
-				'required' => true,
-				'hint'     => trans('admin.twilio_sms_service_sid_hint'),
-				'wrapper'  => [
-					'class' => 'col-md-6 twilio',
-				],
-			];
-			$fields[] = [
-				'name'    => 'twilio_debug_to',
-				'label'   => trans('admin.twilio_debug_to_label'),
-				'type'    => 'text',
-				'hint'    => trans('admin.twilio_debug_to_hint'),
+                        $fields[] = [
+                                'name'     => 'twilio_sms_service_sid',
+                                'label'    => trans('admin.twilio_sms_service_sid_label'),
+                                'type'     => 'text',
+                                'required' => true,
+                                'hint'     => trans('admin.twilio_sms_service_sid_hint'),
+                                'wrapper'  => [
+                                        'class' => 'col-md-6 twilio',
+                                ],
+                        ];
+                        $fields[] = [
+                                'name'     => 'twilio_verify_service_sid',
+                                'label'    => trans('admin.twilio_verify_service_sid_label'),
+                                'type'     => 'text',
+                                'required' => true,
+                                'hint'     => trans('admin.twilio_verify_service_sid_hint'),
+                                'wrapper'  => [
+                                        'class' => 'col-md-6 twilio',
+                                ],
+                        ];
+                        $fields[] = [
+                                'name'    => 'twilio_debug_to',
+                                'label'   => trans('admin.twilio_debug_to_label'),
+                                'type'    => 'text',
+                                'hint'    => trans('admin.twilio_debug_to_hint'),
 				'wrapper' => [
 					'class' => 'col-md-6 twilio',
 				],
