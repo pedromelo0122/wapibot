@@ -15,6 +15,11 @@ return [
     'sms_service_sid' => env('TWILIO_SMS_SERVICE_SID'),
     
     /**
+     * See https://www.twilio.com/docs/verify/api.
+     */
+    'verify_service_sid' => env('TWILIO_VERIFY_SERVICE_SID'),
+    
+    /**
      * Specify a number where all calls/messages should be routed. This can be used in development/staging environments
      * for testing.
      */

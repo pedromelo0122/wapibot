@@ -138,51 +138,72 @@ trait PhoneVerificationTrait
 		$languageCode = (!empty($languageCode) && array_key_exists($languageCode, getSupportedLanguages()))
 			? $languageCode
 			: null;
-		
+
 		$data = [];
-		
+
 		// Get the entity metadata
 		$entityMetadata = $this->getEntityMetadata($entityMetadataKey);
-		
+
 		if (empty($entityMetadata) || empty($object)) {
 			$message = empty($entityMetadata)
 				? sprintf($this->metadataNotFoundMessage, $entityMetadataKey)
 				: trans('auth.entity_id_not_found');
-			
+
 			$data['success'] = false;
 			$data['message'] = $message;
-			
+
 			return $data;
 		}
-		
+
 		// Update data & extra
 		$data = $this->updateExtraDataForPhone($entityMetadata, $object, $data);
 		$fieldHiddenValue = $data['extra']['fieldHiddenValue'] ?? '*********';
-		
-		// Send Confirmation Email
+
+		// Try Twilio Verify API first if available
+		$twilioVerifyService = app(\App\Services\TwilioVerifyService::class);
+		if ($twilioVerifyService->isAvailable() && config('settings.sms.driver') == 'twilio') {
+			$phoneNumber = $object->phone;
+			if (!empty($phoneNumber)) {
+				$result = $twilioVerifyService->sendVerificationCode($phoneNumber);
+				
+				if ($result['success']) {
+					if ($displayFlashMessage) {
+						$message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
+						$data['success'] = true;
+						$data['message'] = $message;
+					}
+					
+					$data['extra']['fieldVerificationSent'] = true;
+					return $data;
+				}
+				// If Twilio Verify fails, fall back to regular SMS
+			}
+		}
+
+		// Send Confirmation SMS using regular notification system
 		try {
 			if (!empty($languageCode)) {
 				$object->notify((new VerifyPhoneCode($object, $entityMetadata))->locale($languageCode));
 			} else {
 				$object->notify(new VerifyPhoneCode($object, $entityMetadata));
 			}
-			
+
 			if ($displayFlashMessage) {
 				$message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
-				
+
 				$data['success'] = true;
 				$data['message'] = $message;
 			}
-			
+
 			$data['extra']['fieldVerificationSent'] = true;
-			
+
 			return $data;
 		} catch (Throwable $e) {
 			$message = replaceNewlinesWithSpace($e->getMessage());
-			
+
 			$data['success'] = false;
 			$data['message'] = $message;
-			
+
 			return $data;
 		}
 	}

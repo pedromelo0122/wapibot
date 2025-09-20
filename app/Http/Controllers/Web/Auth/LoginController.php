@@ -147,6 +147,51 @@ class LoginController extends FrontController
 			}
 		}
 		
+		// Phone Verification Check
+		// If login failed due to unverified phone, redirect to phone verification
+		if (!$success) {
+			$isUnverifiedField = data_get($data, 'extra.isUnverifiedField');
+			$field = data_get($data, 'extra.field');
+			$resendUrl = data_get($data, 'extra.resendUrl');
+			
+			if ($isUnverifiedField && $field == 'phone' && !empty($resendUrl)) {
+				// Store the auth field value for the verification form
+				$fieldValue = data_get($data, 'extra.fieldValue');
+				$fieldHiddenValue = data_get($data, 'extra.fieldHiddenValue');
+				
+				if (!empty($fieldHiddenValue)) {
+					session()->put('authFieldValue', $fieldHiddenValue);
+				}
+				
+				// Flash the verification message
+				if (!empty($message)) {
+					flash($message)->info();
+				}
+				
+				// Redirect to phone verification page
+				return redirect()->to(url('verify/users/phone'));
+			}
+			
+			// For email verification or other failures
+			if ($isUnverifiedField && $field == 'email' && !empty($resendUrl)) {
+				// Store the auth field value for the verification form
+				$fieldValue = data_get($data, 'extra.fieldValue');
+				$fieldHiddenValue = data_get($data, 'extra.fieldHiddenValue');
+				
+				if (!empty($fieldHiddenValue)) {
+					session()->put('authFieldValue', $fieldHiddenValue);
+				}
+				
+				// Flash the verification message
+				if (!empty($message)) {
+					flash($message)->info();
+				}
+				
+				// Redirect to email verification page
+				return redirect()->to(url('verify/users/email'));
+			}
+		}
+		
 		if ($success) {
 			return $this->createNewSession($data);
 		}

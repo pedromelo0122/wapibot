@@ -45,19 +45,25 @@ trait VerifyCode
 		if (empty($token)) {
 			return $this->showOtpVerificationForm($entityMetadataKey, $field);
 		}
-		
-		// Verify the entity
+
 		$queryParams = [
 			'deviceName' => 'Website',
 		];
+		
+		// Try standard verification first
 		$data = getServiceData((new VerificationService())->verifyCode($entityMetadataKey, $field, $token, $queryParams));
 		
+		// If standard verification failed and this is phone verification, try Twilio Verify
+		if (!data_get($data, 'success') && $field == 'phone') {
+			$data = $this->attemptTwilioVerifyCheck($entityMetadataKey, $token, $queryParams);
+		}
+
 		// Parsing the API response
 		$message = data_get($data, 'message');
-		
+
 		// Get the Entity Object (User or Post model's entry)
 		$entityObject = data_get($data, 'result');
-		
+
 		// Check the request status
 		if (data_get($data, 'success')) {
 			flash($message)->success();
@@ -66,22 +72,22 @@ trait VerifyCode
 				return $this->showOtpVerificationForm($entityMetadataKey, $field, $message);
 			}
 		}
-		
+
 		$nextUrl = url('/?from=verification');
-		
+
 		// Remove Notification Trigger
 		if (session()->has('emailOrPhoneChanged')) {
 			session()->forget('emailOrPhoneChanged');
 		}
 		clearResendVerificationData();
-		
+
 		// users
 		if ($entityMetadataKey == 'users') {
 			$user = $entityObject;
-			
+
 			$userId = data_get($user, 'id');
 			$authToken = data_get($data, 'extra.authToken');
-			
+
 			if (!empty($userId)) {
 				// Auto log-in the user
 				if (auth()->loginUsingId($userId)) {
@@ -97,17 +103,17 @@ trait VerifyCode
 					}
 				}
 			}
-			
+
 			// Remove Next URL session
 			if (session()->has('userNextUrl')) {
 				session()->forget('userNextUrl');
 			}
 		}
-		
+
 		// posts
 		if ($entityMetadataKey == 'posts') {
 			$post = $entityObject;
-			
+
 			// Get Listing creation next URL
 			if (session()->has('itemNextUrl')) {
 				$nextUrl = session('itemNextUrl');
@@ -117,25 +123,126 @@ trait VerifyCode
 			} else {
 				$nextUrl = urlGen()->post($post);
 			}
-			
+
 			// Remove Next URL session
 			if (session()->has('itemNextUrl')) {
 				session()->forget('itemNextUrl');
 			}
 		}
-		
+
 		// password (Forgot Password)
 		if ($entityMetadataKey == 'password') {
 			$nextUrl = url()->previous();
 			if (session()->has('passwordNextUrl')) {
 				$nextUrl = session('passwordNextUrl');
-				
+
 				// Remove Next URL session
 				session()->forget('passwordNextUrl');
 			}
 		}
-		
+
 		return redirect()->to($nextUrl);
+	}
+	
+	/**
+	 * Attempt to verify using Twilio Verify API
+	 *
+	 * @param string $entityMetadataKey
+	 * @param string $code
+	 * @param array $queryParams
+	 * @return array
+	 */
+	private function attemptTwilioVerifyCheck(string $entityMetadataKey, string $code, array $queryParams = []): array
+	{
+		$twilioVerifyService = app(\App\Services\TwilioVerifyService::class);
+		
+		if (!$twilioVerifyService->isAvailable() || config('settings.sms.driver') != 'twilio') {
+			return [
+				'success' => false,
+				'message' => trans('auth.field_verification_failed', ['field' => trans('auth.phone_number')])
+			];
+		}
+		
+		// Get phone number from session data
+		$resendVerificationData = getResendVerificationDataFromSession();
+		$phoneNumber = $resendVerificationData['fieldValue'] ?? null;
+		
+		if (empty($phoneNumber)) {
+			return [
+				'success' => false,
+				'message' => trans('auth.field_verification_failed', ['field' => trans('auth.phone_number')])
+			];
+		}
+		
+		// Verify with Twilio
+		$result = $twilioVerifyService->verifyCode($phoneNumber, $code);
+		
+		if (!$result['success']) {
+			return [
+				'success' => false,
+				'message' => trans('auth.field_verification_failed', ['field' => trans('auth.phone_number')])
+			];
+		}
+		
+		// Find user by phone number and mark as verified
+		$entityMetadata = (new VerificationService())->getEntityMetadata($entityMetadataKey);
+		if (empty($entityMetadata)) {
+			return [
+				'success' => false,
+				'message' => trans('auth.entity_id_not_found')
+			];
+		}
+		
+		$model = $entityMetadata['model'];
+		$object = $model::query()
+			->withoutGlobalScopes($entityMetadata['scopes'])
+			->where('phone', $phoneNumber)
+			->first();
+			
+		if (empty($object)) {
+			return [
+				'success' => false,
+				'message' => trans('auth.field_verification_failed', ['field' => trans('auth.phone_number')])
+			];
+		}
+		
+		// Mark phone as verified
+		if (empty($object->phone_verified_at)) {
+			$object->phone_verified_at = now();
+			$object->save();
+		}
+		
+		$fieldLabel = mb_strtolower(trans('auth.phone_number'));
+		$message = trans('auth.field_successfully_verified', [
+			'name'  => $object->{$entityMetadata['nameColumn']},
+			'field' => $fieldLabel,
+		]);
+		
+		$data = [
+			'success' => true,
+			'message' => $message,
+		];
+		
+		// Add result based on entity type
+		if ($entityMetadataKey == 'users') {
+			$data['result'] = new \App\Http\Resources\UserResource($object, $queryParams);
+			
+			// Login logic for verified users
+			if (isVerifiedUser($object) && empty($object->suspended_at) && empty($object->deleted_at)) {
+				$extra = [];
+				$deviceName = $queryParams['deviceName'] ?? 'Website';
+				$token = $object->createToken($deviceName);
+				$extra['authToken'] = $token->plainTextToken;
+				$extra['tokenType'] = 'Bearer';
+				$data['extra'] = $extra;
+			}
+		}
+		
+		if ($entityMetadataKey == 'posts') {
+			$data['result'] = new \App\Http\Resources\PostResource($object, $queryParams);
+		}
+		
+		return $data;
 	}
 	
 	/**
