@@ -18,6 +18,7 @@ namespace App\Services\Auth\Traits\Custom\Verification;
 
 use App\Helpers\Common\Num;
 use App\Services\Auth\App\Notifications\VerifyPhoneCode;
+use App\Services\Twilio\TwilioVerifyService;
 use Illuminate\Http\JsonResponse;
 use Throwable;
 
@@ -159,17 +160,32 @@ trait PhoneVerificationTrait
 		$data = $this->updateExtraDataForPhone($entityMetadata, $object, $data);
 		$fieldHiddenValue = $data['extra']['fieldHiddenValue'] ?? '*********';
 		
-		// Send Confirmation Email
-		try {
-			if (!empty($languageCode)) {
-				$object->notify((new VerifyPhoneCode($object, $entityMetadata))->locale($languageCode));
-			} else {
-				$object->notify(new VerifyPhoneCode($object, $entityMetadata));
-			}
-			
-			if ($displayFlashMessage) {
-				$message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
-				
+                $useTwilioVerify = (
+                        config('settings.sms.driver') == 'twilio'
+                        && !empty(config('twilio-notification-channel.verify_service_sid'))
+                );
+
+                // Send Confirmation Email
+                try {
+                        if ($useTwilioVerify) {
+                                /** @var \App\Services\Twilio\TwilioVerifyService $twilioVerify */
+                                $twilioVerify = app(TwilioVerifyService::class);
+
+                                $phoneNumber = phoneE164($object->phone, $object->phone_country);
+                                $phoneNumber = setPhoneSign($phoneNumber, 'twilio');
+
+                                $twilioVerify->sendVerification($phoneNumber, (string)$object->phone_token, $languageCode);
+                        } else {
+                                if (!empty($languageCode)) {
+                                        $object->notify((new VerifyPhoneCode($object, $entityMetadata))->locale($languageCode));
+                                } else {
+                                        $object->notify(new VerifyPhoneCode($object, $entityMetadata));
+                                }
+                        }
+
+                        if ($displayFlashMessage) {
+                                $message = trans('auth.verification_code_sent', ['fieldHiddenValue' => $fieldHiddenValue]);
+
 				$data['success'] = true;
 				$data['message'] = $message;
 			}

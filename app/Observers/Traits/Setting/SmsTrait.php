@@ -51,12 +51,13 @@ trait SmsTrait
 			&& !DotenvEditor::keyExists('TWILIO_USERNAME')
 			&& !DotenvEditor::keyExists('TWILIO_PASSWORD')
 			&& !DotenvEditor::keyExists('TWILIO_AUTH_TOKEN')
-			&& !DotenvEditor::keyExists('TWILIO_ACCOUNT_SID')
-			&& !DotenvEditor::keyExists('TWILIO_FROM')
-			&& !DotenvEditor::keyExists('TWILIO_ALPHA_SENDER')
-			&& !DotenvEditor::keyExists('TWILIO_SMS_SERVICE_SID')
-			&& !DotenvEditor::keyExists('TWILIO_DEBUG_TO')
-		) {
+                        && !DotenvEditor::keyExists('TWILIO_ACCOUNT_SID')
+                        && !DotenvEditor::keyExists('TWILIO_FROM')
+                        && !DotenvEditor::keyExists('TWILIO_ALPHA_SENDER')
+                        && !DotenvEditor::keyExists('TWILIO_SMS_SERVICE_SID')
+                        && !DotenvEditor::keyExists('TWILIO_VERIFY_SERVICE_SID')
+                        && !DotenvEditor::keyExists('TWILIO_DEBUG_TO')
+                ) {
 			DotenvEditor::addEmpty();
 			$envFileHasChanged = true;
 		}
@@ -131,16 +132,23 @@ trait SmsTrait
 				DotenvEditor::deleteKey('TWILIO_ALPHA_SENDER');
 			}
 		}
-		if (array_key_exists('twilio_sms_service_sid', $setting->field_values)) {
-			if (!empty($setting->field_values['twilio_sms_service_sid'])) {
-				DotenvEditor::setKey('TWILIO_SMS_SERVICE_SID', $setting->field_values['twilio_sms_service_sid']);
-			} else {
-				DotenvEditor::deleteKey('TWILIO_SMS_SERVICE_SID');
-			}
-		}
-		if (array_key_exists('twilio_debug_to', $setting->field_values)) {
-			if (!empty($setting->field_values['twilio_debug_to'])) {
-				DotenvEditor::setKey('TWILIO_DEBUG_TO', $setting->field_values['twilio_debug_to']);
+                if (array_key_exists('twilio_sms_service_sid', $setting->field_values)) {
+                        if (!empty($setting->field_values['twilio_sms_service_sid'])) {
+                                DotenvEditor::setKey('TWILIO_SMS_SERVICE_SID', $setting->field_values['twilio_sms_service_sid']);
+                        } else {
+                                DotenvEditor::deleteKey('TWILIO_SMS_SERVICE_SID');
+                        }
+                }
+                if (array_key_exists('twilio_verify_service_sid', $setting->field_values)) {
+                        if (!empty($setting->field_values['twilio_verify_service_sid'])) {
+                                DotenvEditor::setKey('TWILIO_VERIFY_SERVICE_SID', $setting->field_values['twilio_verify_service_sid']);
+                        } else {
+                                DotenvEditor::deleteKey('TWILIO_VERIFY_SERVICE_SID');
+                        }
+                }
+                if (array_key_exists('twilio_debug_to', $setting->field_values)) {
+                        if (!empty($setting->field_values['twilio_debug_to'])) {
+                                DotenvEditor::setKey('TWILIO_DEBUG_TO', $setting->field_values['twilio_debug_to']);
 			} else {
 				DotenvEditor::deleteKey('TWILIO_DEBUG_TO');
 			}
@@ -153,12 +161,13 @@ trait SmsTrait
 			|| array_key_exists('twilio_username', $setting->field_values)
 			|| array_key_exists('twilio_password', $setting->field_values)
 			|| array_key_exists('twilio_auth_token', $setting->field_values)
-			|| array_key_exists('twilio_account_sid', $setting->field_values)
-			|| array_key_exists('twilio_from', $setting->field_values)
-			|| array_key_exists('twilio_alpha_sender', $setting->field_values)
-			|| array_key_exists('twilio_sms_service_sid', $setting->field_values)
-			|| array_key_exists('twilio_debug_to', $setting->field_values)
-		) {
+                        || array_key_exists('twilio_account_sid', $setting->field_values)
+                        || array_key_exists('twilio_from', $setting->field_values)
+                        || array_key_exists('twilio_alpha_sender', $setting->field_values)
+                        || array_key_exists('twilio_sms_service_sid', $setting->field_values)
+                        || array_key_exists('twilio_verify_service_sid', $setting->field_values)
+                        || array_key_exists('twilio_debug_to', $setting->field_values)
+                ) {
 			$envFileHasChanged = true;
 		}
 		

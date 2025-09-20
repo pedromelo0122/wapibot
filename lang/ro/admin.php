@@ -1379,6 +1379,8 @@ NOTĂ: Am dezactivat limita de timp a execuției PHP <code>set_time_limit(0);</c
     'twilio_alpha_sender_hint' => 'Alphanumeric Sender ID allows you to set your company name or brand as the Sender ID when sending one-way SMS messages to supported countries. Alphanumeric Sender IDs may be up to 11 characters. Accepted characters include both upper- and lower-case ASCII letters, the digits 0 through 9, and space: A-Z, a-z, 0-9. They may not be only numbers. <a href="https://www.twilio.com/docs/glossary/what-alphanumeric-sender-id" target="_blank">More information</a>.',
     'twilio_sms_service_sid_label' => 'Messaging Service SID (SMS Service SID)',
     'twilio_sms_service_sid_hint' => 'From your Twilio console, create a <a href="https://www.twilio.com/console/sms/services" target="_blank">Messaging</a> service and get its <code>SID</code>. See the <a href="https://www.twilio.com/docs/messaging/services" target="_blank">Messaging Services</a>\' documentation.',
+    'twilio_verify_service_sid_label' => 'Verify Service SID',
+    'twilio_verify_service_sid_hint' => 'From your Twilio console, create a <a href="https://www.twilio.com/console/verify/services" target="_blank">Verify</a> service and get its <code>SID</code>. See the <a href="https://www.twilio.com/docs/verify" target="_blank">Verify</a> documentation.',
     'twilio_debug_to_label' => 'Debug To',
     'twilio_debug_to_hint' => 'Specify a number where all messages should be routed. This can be used in development/staging environments for testing.',
     'seo_site_verification_hint' => 'NOTE: This site verification is related to meta tag verification. So, enter the meta content value.',
